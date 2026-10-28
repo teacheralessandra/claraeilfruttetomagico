@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>CLARA E IL CESTINO MAGICO 🍎✨</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:manipulation}
+html,body{
+  width:100%;
+  height:100%;
+  overflow:hidden;
+  background:#102306;
+  font-family:Fredoka,'Comic Sans MS',cursive,sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* CONTENITORE TOTALE A SCHERMO INTERO */
+#game-stage-wrapper{
+  position:relative;
+  width:100vw;
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  background:linear-gradient(180deg, #7ecbf7 0%, #a9e48f 52%, #4a8f27 100%);
+}
+
+/* SFONDO AMBIENTALE SENZA DUPLICAZIONE DEI PERSONAGGI:
+   SFUMATURA ARMONIOSA NATURALE CHE CONTINUA IL CIELO E IL PRATO */
+#ambient-background{
+  position:absolute;
+  inset:0;
+  background:radial-gradient(ellipse at 50% 15%, #bce9ff 0%, #68bbf2 40%, transparent 75%),
+             radial-gradient(ellipse at 50% 88%, #5eb42a 0%, #2f6916 65%, #183e0a 100%);
+  pointer-events:none;
+  z-index:0;
+}
+
+/* LIVELLO DI GIOCO PRINCIPALE: PROPORZIONI PERFETTE 16:9, NESSUNA DEFORMAZIONE O TAGLIO */
+#game-viewport{
+  position:relative;
+  width:min(100vw,calc(100vh * 16 / 9));
+  height:min(100vh,calc(100vw * 9 / 16));
+  aspect-ratio:16/9;
+  overflow:hidden;
+  box-shadow:0 0 50px rgba(0,0,0,0.65), 0 0 100px rgba(0,0,0,0.45);
+  background:#2e7d32;
+  z-index:1;
+}
+
+/* IMMAGINE PRINCIPALE NITIDA SENZA DEFORMAZIONI */
+#game-background{
+  position:absolute;
+  inset:0;
+  background-image:url('https://i.postimg.cc/6p9VVy2z/nuovosfondofrutteto-jpg.jpg');
+  background-size:100% 100%;
+  background-position:center center;
+  background-repeat:no-repeat;
+  z-index:1;
+  pointer-events:none;
+}
+#bg-fallback{
+  display:none;
+  position:absolute;
+  inset:0;
+  background:linear-gradient(#74b9ff,#a8e6cf 55%,#2ecc71);
+  z-index:0;
+  align-items:center;
+  justify-content:center;
+  font-size:20px;
+  font-weight:800;
+  color:#1b4332;
+}
+
+/* HUD LAYER */
+#hud-layer{position:absolute;inset:0 0 auto;z-index:50;pointer-events:none}
+.hud-bar{display:flex;justify-content:space-between;align-items:center;gap:6px;padding:clamp(5px,1.2vh,14px) clamp(8px,1.6vw,20px)}
+.hud-group{display:flex;gap:clamp(4px,0.8vw,12px);align-items:center;flex-wrap:wrap}
+.hud-chip,.btn-ctrl{
+  border:2px solid #f6b93b;
+  border-radius:999px;
+  padding:clamp(4px,0.8vh,8px) clamp(8px,1.1vw,15px);
+  font-weight:800;
+  font-size:clamp(10px,1.35vw,17px);
+  white-space:nowrap;
+  box-shadow:0 3px 9px rgba(0,0,0,0.25);
+}
+.hud-chip{background:rgba(255,255,255,0.95);color:#3d2503;display:flex;align-items:center;gap:5px}
+.btn-ctrl{
+  pointer-events:auto;
+  cursor:pointer;
+  background:linear-gradient(#ffffff,#ffeaa7);
+  border-color:#e17055;
+  color:#d63031;
+  font-family:inherit;
+  transition:transform 0.15s,filter 0.15s;
+}
+.btn-ctrl:active,.btn-big-action:active{transform:scale(0.96)}
+.btn-ctrl:hover{filter:brightness(1.05)}
+
+/* MELE IN GIOCO (CADUTA E PRATO) */
+#apples-container{position:absolute;inset:0;z-index:20;pointer-events:none}
+.falling-apple{
+  position:absolute;
+  pointer-events:auto;
+  cursor:pointer;
+  width:clamp(36px,5.3vw,72px);
+  height:clamp(42px,6.3vw,84px);
+  transform-origin:center;
+  transition:filter 0.18s;
+  filter:drop-shadow(0 6px 7px rgba(0,0,0,0.45));
+  will-change:transform,left,top;
+}
+.falling-apple:hover{filter:drop-shadow(0 9px 13px rgba(0,0,0,0.55)) brightness(1.1)}
+.falling-apple.selected{
+  filter:drop-shadow(0 0 12px #fff) drop-shadow(0 0 20px #ffd32a) brightness(1.2)!important;
+  animation:pulseSelect 0.5s infinite alternate!important;
+  z-index:35!important;
+}
+@keyframes pulseSelect{to{transform:scale(1.16) rotate(4deg)}}
+.falling-apple.wrong-shake{
+  animation:shakeWrong 0.42s ease-in-out!important;
+  filter:drop-shadow(0 0 15px #e74c3c)!important;
+}
+@keyframes shakeWrong{
+  20%{transform:translateX(-8px) rotate(-6deg)}
+  40%{transform:translateX(8px) rotate(6deg)}
+  60%{transform:translateX(-5px) rotate(4deg)}
+  80%{transform:translateX(4px) rotate(-2deg)}
+}
+.apple-svg{width:100%;height:100%;display:block;overflow:visible}
+.apple-num-text{
+  font-family:Fredoka,Arial,sans-serif;
+  font-weight:800;
+  font-size:46px;
+  text-anchor:middle;
+  dominant-baseline:central;
+  fill:#fff;
+  stroke:rgba(0,0,0,0.65);
+  stroke-width:5px;
+  paint-order:stroke fill;
+}
+
+/* =========================================================================
+   CESTINO MAGICO PNG
+   ========================================================================= */
+#basket-station{
+  position:absolute;
+  left:22%;
+  bottom:3%;
+  width:29%;
+  height:41%;
+  z-index:26;
+  pointer-events:none;
+}
+/* Livello base: immagine del cesto con mele incorporate */
+#basket-png-img{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:bottom center;
+  z-index:1;
+  filter:drop-shadow(0 10px 16px rgba(0,0,0,0.5));
+}
+/* Bordo frontale per far scomparire le mele dentro la conca */
+#basket-front-rim{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  object-fit:contain;
+  object-position:bottom center;
+  z-index:5;
+  clip-path:polygon(0% 64%, 100% 64%, 100% 100%, 0% 100%);
+  -webkit-clip-path:polygon(0% 64%, 100% 64%, 100% 100%, 0% 100%);
+  pointer-events:none;
+}
+/* Bagliore magico dorato quando una coppia entra */
+#basket-glow-ring{
+  position:absolute;
+  top:24%;
+  left:10%;
+  width:80%;
+  height:56%;
+  border-radius:50%;
+  opacity:0;
+  background:radial-gradient(ellipse, rgba(255,235,59,0.95), rgba(255,215,0,0.45) 55%, transparent 75%);
+  z-index:8;
+}
+#basket-glow-ring.glow-active{animation:basketPulseGlow 0.8s ease-out forwards}
+@keyframes basketPulseGlow{
+  0%{transform:scale(0.6);opacity:0}
+  35%{transform:scale(1.2);opacity:1}
+  100%{transform:scale(1);opacity:0}
+}
+
+/* PARTICELLE ED EFFETTI */
+#fx-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:45}
+
+/* POPUP MESSAGGI POSITIVI IN INGLESE */
+#encouragement-popup{
+  position:absolute;
+  top:26%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(0);
+  z-index:55;
+  pointer-events:none;
+  background:linear-gradient(135deg,#fbc531,#e1b12c);
+  color:white;
+  padding:clamp(7px,1.4vh,15px) clamp(16px,3.2vw,42px);
+  border-radius:999px;
+  font-size:clamp(19px,3vw,36px);
+  font-weight:800;
+  border:4px solid white;
+  box-shadow:0 12px 30px rgba(225,177,44,0.6);
+  text-shadow:2px 2px rgba(0,0,0,0.3);
+  opacity:0;
+  white-space:nowrap;
+  transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1),opacity 0.25s;
+}
+#encouragement-popup.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+
+/* TOAST PASSAGGIO DI LIVELLO */
+#level-toast{
+  position:absolute;
+  top:45%;
+  left:50%;
+  transform:translate(-50%,-50%) scale(0);
+  background:linear-gradient(135deg,#6c5ce7,#a29bfe);
+  border:5px solid white;
+  border-radius:28px;
+  padding:clamp(14px,2.5vh,26px) clamp(20px,4.2vw,48px);
+  color:white;
+  text-align:center;
+  box-shadow:0 18px 45px rgba(0,0,0,0.45);
+  z-index:60;
+  pointer-events:none;
+  opacity:0;
+  transition:transform 0.35s cubic-bezier(0.34,1.56,0.64,1),opacity 0.25s;
+}
+#level-toast.show{transform:translate(-50%,-50%) scale(1);opacity:1}
+#level-toast h2{font-size:clamp(21px,3.6vw,42px);margin-bottom:5px}
+#level-toast p{font-size:clamp(13px,1.7vw,19px);font-weight:600}
+
+/* SCHERMATE MODALI (START & VITTORIA) */
+.screen-overlay{
+  position:absolute;
+  inset:0;
+  background:rgba(10,22,6,0.85);
+  backdrop-filter:blur(5px);
+  z-index:70;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  padding:clamp(10px,2.2vw,20px);
+  opacity:1;
+  transition:opacity 0.3s;
+}
+.screen-overlay.hidden{opacity:0;pointer-events:none}
+.modal-box{
+  background:linear-gradient(#ffffff,#f4fbf0);
+  border:4px solid #4cd137;
+  border-radius:clamp(18px,3vw,30px);
+  padding:clamp(14px,2.6vh,28px) clamp(14px,2.8vw,34px);
+  max-width:600px;
+  width:min(92%,600px);
+  max-height:96%;
+  overflow:auto;
+  box-shadow:0 20px 50px rgba(0,0,0,0.45);
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  animation:modalPop 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes modalPop{from{transform:scale(0.75);opacity:0}to{transform:scale(1);opacity:1}}
+.game-main-title{
+  font-size:clamp(19px,3.2vw,36px);
+  font-weight:800;
+  color:#eb4d4b;
+  margin-bottom:6px;
+  text-shadow:2px 2px #ffeaa7,3px 5px 12px rgba(0,0,0,0.25);
+  line-height:1.15;
+}
+.game-subtitle{font-size:clamp(12px,1.4vw,16px);font-weight:700;color:#0984e3;margin-bottom:12px}
+.friends-strip{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-bottom:12px}
+.friends-pill{
+  background:#fff;
+  padding:4px 9px;
+  border-radius:14px;
+  border:2px solid #fdcb6e;
+  font-weight:800;
+  font-size:clamp(11px,1.2vw,14px);
+  color:#d35400;
+}
+.instructions-box{
+  background:#e8f7ff;
+  border:2px dashed #0984e3;
+  border-radius:16px;
+  padding:10px 14px;
+  margin-bottom:14px;
+  color:#2d3436;
+  font-size:clamp(11px,1.2vw,14px);
+  line-height:1.45;
+  font-weight:600;
+  text-align:left;
+  width:100%;
+}
+.btn-big-action{
+  background:linear-gradient(#ff9f1a,#ee5253);
+  color:#fff;
+  font-family:inherit;
+  font-weight:800;
+  font-size:clamp(16px,2vw,23px);
+  padding:10px 30px;
+  border:4px solid white;
+  border-radius:999px;
+  cursor:pointer;
+  box-shadow:0 8px 20px rgba(238,82,83,0.5),0 4px 0 #b33939;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  transition:transform 0.15s,filter 0.15s;
+}
+.btn-big-action:hover{filter:brightness(1.05);transform:scale(1.02)}
+@media(max-width:600px){
+  .hud-bar{align-items:flex-start}
+  .hud-group{gap:3px}
+  .hud-chip,.btn-ctrl{border-width:1.5px;padding:4px 7px}
+  .modal-box{width:96%;padding:12px}
+  .instructions-box{margin-bottom:8px}
+  .friends-strip{margin-bottom:8px}
+}
+</style>
+</head>
+<body>
+<div id="game-stage-wrapper">
+  <!-- SFONDO AMBIENTALE CHE COPRE TUTTO LO SCHERMO CON LA STESSA IMMAGINE SFOCATA -->
+  <div id="ambient-background"></div>
+
+  <!-- VIEWPORT DI GIOCO 16:9 PROPORZIONATO AL 100% (NESSUNA DEFORMAZIONE) -->
+  <div id="game-viewport">
+    <div id="game-background"></div>
+    <div id="bg-fallback">🍎 Frutteto Magico di Clara 🍎</div>
+
+    <!-- HUD SUPERIORE -->
+    <div id="hud-layer">
+      <div class="hud-bar">
+        <div class="hud-group">
+          <div class="hud-chip" id="chip-level">🌟 LEVEL 1/10</div>
+          <div class="hud-chip" id="chip-score">⭐ 0 PTS</div>
+          <div class="hud-chip" id="chip-pairs">🧺 0 / 3</div>
+        </div>
+        <div class="hud-group">
+          <button class="btn-ctrl" id="btn-audio"><span id="audio-icon">🔊</span> AUDIO ON</button>
+          <button class="btn-ctrl" id="btn-restart">🔄 RESTART</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENITORE MELE IN GIOCO -->
+    <div id="apples-container"></div>
+
+    <!-- CESTINO MAGICO PNG CON MELE INCORPORATE -->
+    <div id="basket-station">
+      <img id="basket-png-img" src="https://i.postimg.cc/9Ft98Cyz/cestomele-removebg-preview.png" alt="Cestino Magico con Mele">
+      <img id="basket-front-rim" src="https://i.postimg.cc/9Ft98Cyz/cestomele-removebg-preview.png" alt="Bordo Cestino">
+      <div id="basket-glow-ring"></div>
+    </div>
+
+    <!-- EFFETTI GRAFICI E POPUP -->
+    <div id="encouragement-popup">FANTASTIC! ✨</div>
+    <div id="level-toast">
+      <h2 id="toast-title">LEVEL UP! 🌟</h2>
+      <p id="toast-desc">Great job! You are a star!</p>
+    </div>
+    <canvas id="fx-canvas"></canvas>
+
+    <!-- SCHERMATA START -->
+    <div class="screen-overlay" id="start-screen">
+      <div class="modal-box">
+        <h1 class="game-main-title">CLARA E IL CESTINO MAGICO 🍎✨</h1>
+        <div class="game-subtitle">Impara gli Amici del 10 raccogliendo tutte le mele incantate nel cestino!</div>
+        <div class="friends-strip">
+          <span class="friends-pill">1 + 9 = 10</span>
+          <span class="friends-pill">2 + 8 = 10</span>
+          <span class="friends-pill">3 + 7 = 10</span>
+          <span class="friends-pill">4 + 6 = 10</span>
+          <span class="friends-pill">5 + 5 = 10</span>
+        </div>
+        <div class="instructions-box">
+          ✨ <strong>Come si gioca:</strong><br>
+          • Le mele cadono dall'albero (a sinistra, al centro e a destra) e si fermano sul prato.<br>
+          • Tocca due mele la cui somma fa <strong>10</strong> sia mentre cadono che quando sono sul prato.<br>
+          • Le mele voleranno con un bagliore magico <strong>dentro il cestino</strong> scomparendo al suo interno!<br>
+          • Al <strong>Livello 10</strong> raccogli tutte le coppie per pulire tutto il prato e vincere! 🏆
+        </div>
+        <button class="btn-big-action" id="btn-start">START GIOCO 🚀</button>
+      </div>
+    </div>
+
+    <!-- SCHERMATA VITTORIA FINALE -->
+    <div class="screen-overlay hidden" id="victory-screen">
+      <div class="modal-box">
+        <div style="font-size:clamp(44px,7vw,70px);animation:modalPop 1s infinite alternate">🏆✨🍎</div>
+        <h1 class="game-main-title" style="color:#10ac84">YOU ARE AMAZING!</h1>
+        <div class="game-subtitle" style="color:#e67e22">Hai raccolto tutte le mele e completato tutti i 10 livelli!</div>
+        <div class="instructions-box" style="text-align:center">
+          ⭐ Punteggio Finale: <strong id="final-score-val" style="color:#e67e22;font-size:22px">0</strong><br>
+          🧺 Coppie del 10 raccolte: <strong id="final-pairs-val" style="color:#27ae60;font-size:22px">0</strong><br>
+          🌈 Il prato è splendente e il cestino è pieno!
+        </div>
+        <button class="btn-big-action" id="btn-play-again">GIOCA ANCORA! 🔄</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   AUDIO ENGINE CON FILE MP3 IN LOOP + EFFETTI SONORI SINTETIZZATI WEB AUDIO API
+   ========================================================================= */
+class AudioEngine {
+  constructor(){
+    this.ctx = null;
+    this.enabled = true;
+    this.bgm = null;
+    this.bgmUrl = 'https://cdn.dbimg.app/Q2yET4Gy.mp3';
+    this.initBgmElement();
+  }
+
+  initBgmElement(){
+    if(!this.bgm){
+      this.bgm = new Audio(this.bgmUrl);
+      this.bgm.loop = true;
+      this.bgm.volume = 0.45;
+      this.bgm.preload = 'auto';
+    }
+  }
+
+  initContext(){
+    if(!this.ctx){
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if(AC) this.ctx = new AC();
+    }
+    if(this.ctx && this.ctx.state === 'suspended'){
+      this.ctx.resume();
+    }
+  }
+
+  toggle(){
+    this.enabled = !this.enabled;
+    if(!this.enabled){
+      this.stopBGM();
+    } else {
+      this.startBGM();
+    }
+    return this.enabled;
+  }
+
+  startBGM(){
+    if(!this.enabled) return;
+    this.initContext();
+    this.initBgmElement();
+    this.bgm.play().catch(() => {});
+  }
+
+  stopBGM(){
+    if(this.bgm){
+      this.bgm.pause();
+    }
+  }
+
+  playTone(freq, type='sine', duration=0.2, gainStart=0.2, gainEnd=0.001){
+    if(!this.enabled) return;
+    this.initContext();
+    if(!this.ctx || freq <= 0) return;
+    try{
+      const o = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(freq, this.ctx.currentTime);
+      g.gain.setValueAtTime(gainStart, this.ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.0001, gainEnd), this.ctx.currentTime + duration);
+      o.connect(g);
+      g.connect(this.ctx.destination);
+      o.start();
+      o.stop(this.ctx.currentTime + duration);
+    }catch(e){}
+  }
+
+  playSelect(){
+    this.playTone(659.25, 'sine', 0.12, 0.22);
+  }
+
+  playCorrect(){
+    [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => {
+      setTimeout(() => this.playTone(f, 'triangle', 0.25, 0.28), i * 65);
+    });
+  }
+
+  playWrong(){
+    this.playTone(280, 'sine', 0.16, 0.18);
+    setTimeout(() => this.playTone(220, 'sine', 0.2, 0.14), 90);
+  }
+
+  playLevelUp(){
+    [523.25, 659.25, 783.99, 1046.5, 1318.51].forEach((f, i) => {
+      setTimeout(() => this.playTone(f, 'sine', 0.32, 0.32), i * 85);
+    });
+  }
+
+  playVictory(){
+    const chords = [523.25, 659.25, 783.99, 1046.5, 1318.51, 1567.98];
+    chords.forEach((f, i) => {
+      setTimeout(() => this.playTone(f, 'triangle', 0.45, 0.35), i * 110);
+    });
+  }
+}
+
+/* =========================================================================
+   COLORI MELE 3D
+   ========================================================================= */
+const APPLE_PALETTES = {
+  1: { main: '#f1c40f', dark: '#d4ac0d', light: '#f9e79f' }, // Giallo
+  2: { main: '#e74c3c', dark: '#c0392b', light: '#f1948a' }, // Rosso
+  3: { main: '#2ecc71', dark: '#27ae60', light: '#abebc6' }, // Verde
+  4: { main: '#e67e22', dark: '#d35400', light: '#f5cba7' }, // Arancione
+  5: { main: '#9b59b6', dark: '#8e44ad', light: '#d7bde2' }, // Viola
+  6: { main: '#3498db', dark: '#2980b9', light: '#aed6f1' }, // Blu
+  7: { main: '#fd79a8', dark: '#e84393', light: '#f8a5c2' }, // Rosa
+  8: { main: '#00cec9', dark: '#00b894', light: '#81ecec' }, // Turchese
+  9: { main: '#ff7675', dark: '#d63031', light: '#fab1a0' }, // Corallo
+  10:{ main: '#f39c12', dark: '#b7791f', light: '#fef08a' }  // Oro
+};
+
+const POSITIVE_MESSAGES = [
+  'Great!', 'Well done!', 'Fantastic!', 'Amazing!', 'You are a star!',
+  'Super work!', 'Magic combo!', 'Brilliant!'
+];
+
+/* =========================================================================
+   PARTICLE ENGINE
+   ========================================================================= */
+class ParticleEngine {
+  constructor(canvas){
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.particles = [];
+    this.resize();
+    this.loop = this.loop.bind(this);
+    requestAnimationFrame(this.loop);
+  }
+
+  resize(){
+    const r = document.getElementById('game-viewport').getBoundingClientRect();
+    this.canvas.width = r.width;
+    this.canvas.height = r.height;
+  }
+
+  trail(x, y, color = '#fff04b'){
+    for(let i = 0; i < 2; i++){
+      this.particles.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y + (Math.random() - 0.5) * 8,
+        vx: (Math.random() - 0.5) * 1.5,
+        vy: (Math.random() - 0.5) * 1.5,
+        size: Math.random() * 4 + 2,
+        color,
+        alpha: 1,
+        decay: 0.04,
+        shape: Math.random() > 0.4 ? 'star' : 'circle'
+      });
+    }
+  }
+
+  burst(x, y, count = 22){
+    const colors = ['#fff200', '#ff3838', '#2ecc71', '#00d2d3', '#ff9ff3', '#fff', '#fdcb6e'];
+    for(let i = 0; i < count; i++){
+      const a = Math.random() * Math.PI * 2;
+      const s = Math.random() * 4.5 + 1.8;
+      this.particles.push({
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s - 1,
+        size: Math.random() * 5 + 2.5,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        alpha: 1,
+        decay: 0.02 + Math.random() * 0.02,
+        shape: Math.random() > 0.3 ? 'star' : 'circle'
+      });
+    }
+  }
+
+  drawStar(x, y, r, ri, color, alpha){
+    const c = this.ctx;
+    c.save();
+    c.beginPath();
+    for(let i = 0; i < 10; i++){
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 ? r * 0.48 : r;
+      const px = x + Math.cos(a) * rr;
+      const py = y + Math.sin(a) * rr;
+      i ? c.lineTo(px, py) : c.moveTo(px, py);
+    }
+    c.closePath();
+    c.globalAlpha = Math.max(0, alpha);
+    c.fillStyle = color;
+    c.fill();
+    c.restore();
+  }
+
+  loop(){
+    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    for(let i = this.particles.length - 1; i >= 0; i--){
+      const p = this.particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.04;
+      p.alpha -= p.decay;
+      if(p.alpha <= 0){
+        this.particles.splice(i, 1);
+        continue;
+      }
+      if(p.shape === 'star') {
+        this.drawStar(p.x, p.y, p.size, p.size / 2, p.color, p.alpha);
+      } else {
+        this.ctx.save();
+        this.ctx.globalAlpha = Math.max(0, p.alpha);
+        this.ctx.fillStyle = p.color;
+        this.ctx.beginPath();
+        this.ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+      }
+    }
+    requestAnimationFrame(this.loop);
+  }
+}
+
+/* =========================================================================
+   GIOCO PRINCIPALE: CLARA E IL CESTINO MAGICO
+   ========================================================================= */
+class ClaraMagicGame {
+  constructor(){
+    this.audio = new AudioEngine();
+    this.particles = new ParticleEngine(document.getElementById('fx-canvas'));
+
+    this.levelConfig = [
+      { apples: 4, pairsNeeded: 3, baseSpeed: 0.45 },
+      { apples: 5, pairsNeeded: 4, baseSpeed: 0.50 },
+      { apples: 5, pairsNeeded: 4, baseSpeed: 0.55 },
+      { apples: 6, pairsNeeded: 5, baseSpeed: 0.60 },
+      { apples: 6, pairsNeeded: 5, baseSpeed: 0.65 },
+      { apples: 7, pairsNeeded: 6, baseSpeed: 0.70 },
+      { apples: 7, pairsNeeded: 6, baseSpeed: 0.76 },
+      { apples: 8, pairsNeeded: 7, baseSpeed: 0.82 },
+      { apples: 8, pairsNeeded: 7, baseSpeed: 0.88 },
+      { apples: 8, pairsNeeded: 4, baseSpeed: 0.95, isFinalClean: true }
+    ];
+
+    this.level = 1;
+    this.score = 0;
+    this.pairsInLevel = 0;
+    this.totalPairs = 0;
+    this.selectedApples = [];
+    this.isLocked = false;
+    this.applesOnBoard = [];
+
+    this.lawnSlots = [
+      { x: 8,  y: 77, occupied: false },
+      { x: 14, y: 73, occupied: false },
+      { x: 20, y: 79, occupied: false },
+      { x: 44, y: 75, occupied: false },
+      { x: 50, y: 73, occupied: false },
+      { x: 56, y: 76, occupied: false },
+      { x: 62, y: 74, occupied: false },
+      { x: 46, y: 84, occupied: false },
+      { x: 53, y: 83, occupied: false },
+      { x: 59, y: 85, occupied: false },
+      { x: 11, y: 85, occupied: false },
+      { x: 65, y: 82, occupied: false }
+    ];
+
+    this.bindDOM();
+    this.bindEvents();
+    this.startContinuousFallLoop();
+
+    window.addEventListener('resize', () => {
+      setTimeout(() => this.particles.resize(), 100);
+    });
+  }
+
+  bindDOM(){
+    const $ = id => document.getElementById(id);
+    this.viewport = $('game-viewport');
+    this.container = $('apples-container');
+    this.basketStation = $('basket-station');
+    this.basketGlowRing = $('basket-glow-ring');
+    this.chipLevel = $('chip-level');
+    this.chipScore = $('chip-score');
+    this.chipPairs = $('chip-pairs');
+    this.btnAudio = $('btn-audio');
+    this.btnRestart = $('btn-restart');
+    this.btnStart = $('btn-start');
+    this.btnPlayAgain = $('btn-play-again');
+    this.startScreen = $('start-screen');
+    this.victoryScreen = $('victory-screen');
+    this.toast = $('level-toast');
+    this.toastTitle = $('toast-title');
+    this.toastDesc = $('toast-desc');
+    this.popupCongrats = $('encouragement-popup');
+  }
+
+  bindEvents(){
+    this.btnStart.addEventListener('click', () => {
+      this.audio.initContext();
+      this.audio.startBGM();
+      this.startScreen.classList.add('hidden');
+      this.particles.resize();
+      this.startNewGame();
+    });
+
+    this.btnPlayAgain.addEventListener('click', () => {
+      this.audio.startBGM();
+      this.victoryScreen.classList.add('hidden');
+      this.startNewGame();
+    });
+
+    this.btnRestart.addEventListener('click', () => {
+      this.audio.playSelect();
+      this.audio.startBGM();
+      this.startNewGame();
+    });
+
+    this.btnAudio.addEventListener('click', () => {
+      const on = this.audio.toggle();
+      this.btnAudio.innerHTML = `<span id="audio-icon">${on ? '🔊' : '🔇'}</span> AUDIO ${on ? 'ON' : 'OFF'}`;
+    });
+  }
+
+  startNewGame(){
+    this.level = 1;
+    this.score = 0;
+    this.pairsInLevel = 0;
+    this.totalPairs = 0;
+    this.selectedApples = [];
+    this.isLocked = false;
+    this.clearBoard();
+    this.updateHUD();
+    this.spawnInitialBoard();
+  }
+
+  clearBoard(){
+    this.applesOnBoard.forEach(a => a.element?.remove());
+    this.applesOnBoard = [];
+    this.selectedApples = [];
+    this.lawnSlots.forEach(s => s.occupied = false);
+  }
+
+  updateHUD(){
+    const cfg = this.levelConfig[this.level - 1];
+    this.chipLevel.textContent = `🌟 LEVEL ${this.level}/10`;
+    this.chipScore.textContent = `⭐ ${this.score} PTS`;
+    this.chipPairs.textContent = `🧺 ${this.pairsInLevel} / ${cfg.pairsNeeded}`;
+  }
+
+  showCongrats(t){
+    this.popupCongrats.textContent = t;
+    this.popupCongrats.classList.add('show');
+    clearTimeout(this.congratsTimer);
+    this.congratsTimer = setTimeout(() => this.popupCongrats.classList.remove('show'), 1100);
+  }
+
+  showToast(t, s, d = 1600){
+    this.toastTitle.textContent = t;
+    this.toastDesc.textContent = s;
+    this.toast.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => this.toast.classList.remove('show'), d);
+  }
+
+  createAppleSVG(num, p){
+    const id = 'ap' + Math.random().toString(36).slice(2, 9);
+    return `<svg class="apple-svg" viewBox="0 0 120 135">
+      <defs>
+        <radialGradient id="${id}b" cx="35%" cy="30%" r="70%">
+          <stop offset="0%" stop-color="${p.light}"/>
+          <stop offset="50%" stop-color="${p.main}"/>
+          <stop offset="90%" stop-color="${p.dark}"/>
+          <stop offset="100%" stop-color="#111" stop-opacity=".4"/>
+        </radialGradient>
+        <linearGradient id="${id}l" x1="0" y1="0" x2="1" y2="1">
+          <stop stop-color="#a8e063"/>
+          <stop offset="1" stop-color="#56ab2f"/>
+        </linearGradient>
+        <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1">
+          <stop stop-color="#fff" stop-opacity=".85"/>
+          <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <ellipse cx="60" cy="128" rx="34" ry="7" fill="#0004"/>
+      <path d="M60 28Q64 12 74 8L67 7Q56 12 56 28Z" fill="#6d4c41" stroke="#3e2723" stroke-width="1.2"/>
+      <path d="M61 22C75 14 90 22 92 32C77 34 65 30 61 22Z" fill="url(#${id}l)" stroke="#2d6a4f" stroke-width="1.2"/>
+      <path d="M60 30C76 22 108 30 110 65C112 95 88 122 60 120C32 122 8 95 10 65C12 30 44 22 60 30Z" fill="url(#${id}b)" stroke="#0005" stroke-width="2.5"/>
+      <ellipse cx="40" cy="48" rx="14" ry="9" transform="rotate(-25 40 48)" fill="url(#${id}g)"/>
+      <ellipse cx="33" cy="44" rx="4" ry="2.5" fill="#fff"/>
+      <text x="60" y="79" class="apple-num-text">${num}</text>
+    </svg>`;
+  }
+
+  getDropLanes(count){
+    const lanes = [];
+    const minX = 7, maxX = 64;
+    const step = count > 1 ? (maxX - minX) / (count - 1) : 0;
+    for(let i = 0; i < count; i++){
+      lanes.push(minX + i * step + (Math.random() - 0.5) * 3);
+    }
+    return lanes.sort(() => Math.random() - 0.5);
+  }
+
+  generateNumbersForBoard(count, isFinalClean = false){
+    const a = [];
+    if(isFinalClean){
+      const totalPairs = count / 2;
+      for(let i = 0; i < totalPairs; i++){
+        const n = 1 + Math.floor(Math.random() * 9);
+        a.push(n, 10 - n);
+      }
+    } else {
+      const pairs = count >= 6 ? 2 : 1;
+      for(let i = 0; i < pairs; i++){
+        const n = 1 + Math.floor(Math.random() * 9);
+        a.push(n, 10 - n);
+      }
+      while(a.length < count){
+        a.push(1 + Math.floor(Math.random() * 9));
+      }
+    }
+    for(let i = a.length - 1; i > 0; i--){
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  spawnInitialBoard(){
+    const cfg = this.levelConfig[this.level - 1];
+    const nums = this.generateNumbersForBoard(cfg.apples, cfg.isFinalClean);
+    const lanes = this.getDropLanes(cfg.apples);
+
+    this.lawnSlots.forEach(s => s.occupied = false);
+
+    nums.forEach((n, i) => {
+      setTimeout(() => {
+        this.spawnApple(n, lanes[i], -(i * 12 + Math.random() * 6));
+      }, i * 240);
+    });
+  }
+
+  getAvailableLawnSlot(preferredX){
+    const available = this.lawnSlots.filter(s => !s.occupied);
+    if(available.length === 0){
+      return { x: 38 + Math.random() * 26, y: 75 + Math.random() * 10, occupied: true };
+    }
+    available.sort((a, b) => Math.abs(a.x - preferredX) - Math.abs(b.x - preferredX));
+    const chosen = available[0];
+    chosen.occupied = true;
+    return chosen;
+  }
+
+  spawnApple(num, laneX, startY = null){
+    const el = document.createElement('div');
+    el.className = 'falling-apple';
+    el.innerHTML = this.createAppleSVG(num, APPLE_PALETTES[num]);
+
+    const yInit = startY !== null ? startY : (-12 - Math.random() * 12);
+    const cfg = this.levelConfig[this.level - 1];
+    const slot = this.getAvailableLawnSlot(laneX);
+
+    const item = {
+      id: 'apple_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7),
+      element: el,
+      number: num,
+      laneX: laneX,
+      x: laneX,
+      y: yInit,
+      targetX: slot.x,
+      targetY: slot.y,
+      assignedSlot: slot,
+      speedY: cfg.baseSpeed + Math.random() * 0.08,
+      swayFreq: 0.035 + Math.random() * 0.02,
+      swayAmp: 0.5 + Math.random() * 0.4,
+      phase: Math.random() * Math.PI * 2,
+      rotation: (Math.random() - 0.5) * 14,
+      state: 'falling'
+    };
+
+    el.style.left = item.x + '%';
+    el.style.top = item.y + '%';
+    el.style.transform = `rotate(${item.rotation}deg)`;
+
+    el.addEventListener('pointerdown', e => {
+      e.stopPropagation();
+      this.onAppleTap(item);
+    });
+
+    this.container.appendChild(el);
+    this.applesOnBoard.push(item);
+  }
+
+  startContinuousFallLoop(){
+    let last = performance.now();
+    const tick = now => {
+      const dt = Math.min(32, now - last);
+      last = now;
+
+      this.applesOnBoard.forEach(a => {
+        if(!a.element.isConnected) return;
+
+        if(a.state === 'falling'){
+          a.y += a.speedY * (dt / 16);
+          a.phase += a.swayFreq;
+
+          const progress = Math.min(1, Math.max(0, (a.y - 12) / (a.targetY - 12)));
+          const curX = (a.laneX * (1 - progress) + a.targetX * progress) + Math.sin(a.phase) * (a.swayAmp * (1 - progress * 0.6));
+          a.rotation = Math.sin(a.phase) * (6 * (1 - progress * 0.5));
+
+          a.element.style.left = curX + '%';
+          a.element.style.top = a.y + '%';
+          a.element.style.transform = `rotate(${a.rotation}deg)`;
+
+          if(a.y >= a.targetY){
+            a.state = 'landed';
+            a.y = a.targetY;
+            a.x = a.targetX;
+            a.element.style.top = a.targetY + '%';
+            a.element.style.left = a.targetX + '%';
+            a.element.style.transform = `rotate(${(Math.random() - 0.5) * 6}deg)`;
+
+            const r = a.element.getBoundingClientRect();
+            const v = this.viewport.getBoundingClientRect();
+            this.particles.burst(r.left + r.width/2 - v.left, r.bottom - v.top, 5);
+
+            this.verifyPairGarantee();
+          }
+        }
+      });
+
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  verifyPairGarantee(){
+    const cfg = this.levelConfig[this.level - 1];
+    if(cfg.isFinalClean) return;
+
+    const active = this.applesOnBoard.filter(a => a.state === 'falling' || a.state === 'landed');
+    let hasPair = false;
+    for(let i = 0; i < active.length; i++){
+      for(let j = i + 1; j < active.length; j++){
+        if(active[i].number + active[j].number === 10){
+          hasPair = true;
+          break;
+        }
+      }
+      if(hasPair) break;
+    }
+
+    if(!hasPair && active.length >= 2){
+      const first = active[0];
+      const second = active[1];
+      const n = 1 + Math.floor(Math.random() * 9);
+      first.number = n;
+      first.element.innerHTML = this.createAppleSVG(n, APPLE_PALETTES[n]);
+      second.number = 10 - n;
+      second.element.innerHTML = this.createAppleSVG(10 - n, APPLE_PALETTES[10 - n]);
+    }
+  }
+
+  onAppleTap(a){
+    if(this.isLocked || a.state === 'flying_to_basket' || this.selectedApples.some(x => x.id === a.id)) return;
+
+    this.audio.playSelect();
+    a.element.classList.add('selected');
+    this.selectedApples.push(a);
+
+    const r = a.element.getBoundingClientRect();
+    const v = this.viewport.getBoundingClientRect();
+    this.particles.burst(r.left + r.width / 2 - v.left, r.top + r.height / 2 - v.top, 8);
+
+    if(this.selectedApples.length === 2){
+      this.isLocked = true;
+      this.evaluateSelection();
+    }
+  }
+
+  evaluateSelection(){
+    const [a, b] = this.selectedApples;
+    if(a.number + b.number === 10){
+      this.onMatchSuccess(a, b);
+    } else {
+      this.onMatchFail(a, b);
+    }
+  }
+
+  onMatchSuccess(a, b){
+    this.audio.playCorrect();
+    this.score += 20;
+    this.pairsInLevel++;
+    this.totalPairs++;
+    this.updateHUD();
+
+    const randomMsg = POSITIVE_MESSAGES[Math.floor(Math.random() * POSITIVE_MESSAGES.length)];
+    this.showCongrats(randomMsg);
+    a.state = b.state = 'flying_to_basket';
+
+    let completedCount = 0;
+    const onBothApplesAbsorbed = () => {
+      completedCount++;
+      if(completedCount < 2) return;
+
+      // Attiva il bagliore magico sul cestino
+      this.basketGlowRing.classList.remove('glow-active');
+      void this.basketGlowRing.offsetWidth;
+      this.basketGlowRing.classList.add('glow-active');
+
+      if(a.assignedSlot) a.assignedSlot.occupied = false;
+      if(b.assignedSlot) b.assignedSlot.occupied = false;
+
+      this.applesOnBoard = this.applesOnBoard.filter(x => x.id !== a.id && x.id !== b.id);
+      this.selectedApples = [];
+
+      const cfg = this.levelConfig[this.level - 1];
+
+      if(cfg.isFinalClean){
+        if(this.applesOnBoard.length === 0){
+          this.triggerVictory();
+        } else {
+          this.isLocked = false;
+        }
+      } else {
+        if(this.pairsInLevel >= cfg.pairsNeeded){
+          this.levelAdvance();
+        } else {
+          this.replenishBoard();
+          this.isLocked = false;
+        }
+      }
+    };
+
+    this.flyAppleToBasket(a, onBothApplesAbsorbed);
+    this.flyAppleToBasket(b, onBothApplesAbsorbed);
+  }
+
+  onMatchFail(a, b){
+    this.audio.playWrong();
+    a.element.classList.remove('selected');
+    b.element.classList.remove('selected');
+    a.element.classList.add('wrong-shake');
+    b.element.classList.add('wrong-shake');
+
+    setTimeout(() => {
+      a.element.classList.remove('wrong-shake');
+      b.element.classList.remove('wrong-shake');
+      this.selectedApples = [];
+      this.isLocked = false;
+    }, 460);
+  }
+
+  flyAppleToBasket(item, done){
+    const el = item.element;
+    el.classList.remove('selected');
+
+    const vr = this.viewport.getBoundingClientRect();
+    const sr = el.getBoundingClientRect();
+    const bStation = this.basketStation.getBoundingClientRect();
+
+    const sx = sr.left - vr.left;
+    const sy = sr.top - vr.top;
+
+    // Destinazione precisa: apertura interna della conca del cestino
+    const targetCenterX = (bStation.left - vr.left) + bStation.width * 0.50;
+    const targetCenterY = (bStation.top - vr.top) + bStation.height * 0.58;
+
+    const tx = targetCenterX - (sr.width * 0.15);
+    const ty = targetCenterY - (sr.height * 0.15);
+
+    this.viewport.appendChild(el);
+    el.style.position = 'absolute';
+    el.style.left = sx + 'px';
+    el.style.top = sy + 'px';
+    el.style.width = sr.width + 'px';
+    el.style.height = sr.height + 'px';
+    // Tra lo z-index del corpo del cesto (1) e del bordo frontale (5)
+    el.style.zIndex = '3';
+    el.style.pointerEvents = 'none';
+    el.style.transition = 'none';
+
+    const duration = 620;
+    const start = performance.now();
+    const cx = (sx + tx) / 2;
+    const cy = Math.min(sy, ty) - Math.min(130, vr.height * 0.22);
+
+    const step = now => {
+      const t = Math.min(1, (now - start) / duration);
+      // Easing in-out cubic
+      const e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+      const x = (1 - e) * (1 - e) * sx + 2 * (1 - e) * e * cx + e * e * tx;
+      const y = (1 - e) * (1 - e) * sy + 2 * (1 - e) * e * cy + e * e * ty;
+      
+      // Rimpicciolimento graduale durante il volo
+      const scale = 1 - e * 0.72;
+      // Dissolvenza magica nella fase terminale quando entra dietro il bordo
+      const opacity = t > 0.85 ? Math.max(0, (1 - t) / 0.15) : 1;
+
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      el.style.opacity = opacity;
+      el.style.transform = `scale(${scale}) rotate(${e * 360}deg)`;
+
+      this.particles.trail(x + (sr.width * scale) / 2, y + (sr.height * scale) / 2);
+
+      if(t < 1){
+        requestAnimationFrame(step);
+      } else {
+        // Scintille magiche nel momento in cui la mela viene assorbita dal cesto
+        this.particles.burst(targetCenterX, targetCenterY, 18);
+        el.remove();
+        if(done) done();
+      }
+    };
+    requestAnimationFrame(step);
+  }
+
+  replenishBoard(){
+    const cfg = this.levelConfig[this.level - 1];
+    if(cfg.isFinalClean) return;
+
+    const target = cfg.apples;
+    const current = this.applesOnBoard.length;
+    const missing = target - current;
+    if(missing <= 0) return;
+
+    const nums = [];
+    const n = 1 + Math.floor(Math.random() * 9);
+    nums.push(n, 10 - n);
+    while(nums.length < missing){
+      nums.push(1 + Math.floor(Math.random() * 9));
+    }
+
+    nums.forEach((num, idx) => {
+      const laneX = 8 + Math.random() * 54;
+      setTimeout(() => {
+        this.spawnApple(num, laneX, -12 - Math.random() * 10);
+      }, idx * 180);
+    });
+  }
+
+  levelAdvance(){
+    this.audio.playLevelUp();
+    if(this.level < 10){
+      this.level++;
+      this.pairsInLevel = 0;
+      this.updateHUD();
+
+      const isTen = this.level === 10;
+      const subtitle = isTen ? "Raccogli TUTTE le mele per ripulire il prato!" : "Great job! You are a star!";
+      this.showToast(`LEVEL ${this.level}! 🌟`, subtitle, isTen ? 2200 : 1600);
+
+      setTimeout(() => {
+        if(isTen){
+          this.clearBoard();
+          this.spawnInitialBoard();
+        } else {
+          this.replenishBoard();
+          this.verifyPairGarantee();
+        }
+        this.isLocked = false;
+      }, isTen ? 2000 : 1500);
+    } else {
+      this.triggerVictory();
+    }
+  }
+
+  triggerVictory(){
+    this.audio.playVictory();
+    setTimeout(() => {
+      document.getElementById('final-score-val').textContent = this.score;
+      document.getElementById('final-pairs-val').textContent = this.totalPairs;
+      this.victoryScreen.classList.remove('hidden');
+      const r = this.viewport.getBoundingClientRect();
+      this.particles.burst(r.width / 2, r.height / 2, 80);
+    }, 600);
+  }
+}
+
+window.addEventListener('load', () => {
+  window.claraGame = new ClaraMagicGame();
+});
+</script>
+</body>
+</html>
